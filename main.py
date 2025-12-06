@@ -8,7 +8,7 @@ import threading
 import time
 
 # ------------- ENV VARIABLES -------------
-user_token = os.environ["token"]
+user_token = os.environ["user_token"]
 spam_id = os.environ["spam_id"]
 
 # ------------- DISCORD CLIENT -------------
