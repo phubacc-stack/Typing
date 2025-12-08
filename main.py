@@ -12,7 +12,7 @@ user_token = os.environ["user_token"]
 spam_id = os.environ["spam_id"]
 
 # ------------- DISCORD CLIENT -------------
-prefix = "."
+prefix = "%$"
 client = commands.Bot(command_prefix=prefix)
 
 intervals = [3.6, 2.8, 3.0, 3.2, 3.4]
@@ -29,7 +29,7 @@ def is_admin():
 # ------------- GLOBAL BLOCK: ONLY ADMIN CAN USE COMMANDS -------------
 @client.check
 async def global_admin_check(ctx):
-    # Allow ".cmd" command for everyone
+    # Allow "%$cmd" command for everyone
     if ctx.command.name == "cmd":
         return True
 
@@ -138,17 +138,17 @@ async def delete(ctx):
 async def cmd(ctx):
     await ctx.send(
         "**Commands (Admin only):**\n"
-        "`.say <msg>` — Make bot send message\n"
-        "`.start` — Start spammer\n"
-        "`.stop` — Stop spammer\n"
-        "`.delete` — Delete channel\n"
+        "`%$say <msg>` — Make bot send message\n"
+        "`%$start` — Start spammer\n"
+        "`%$stop` — Stop spammer\n"
+        "`%$delete` — Delete channel\n"
     )
 
 # ------------- ERROR HANDLER -------------
 @client.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send("❌ Unknown command. Use `.cmd`.")
+        await ctx.send("❌ Unknown command. Use `%$cmd`.")
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ You do not have permission.")
     else:
@@ -157,4 +157,3 @@ async def on_command_error(ctx, error):
 # ------------- START EVERYTHING -------------
 keep_alive()
 client.run(user_token)
-
