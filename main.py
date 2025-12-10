@@ -2,7 +2,7 @@ import os
 import asyncio
 import random
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from flask import Flask
 import threading
 import time
@@ -12,28 +12,23 @@ user_token = os.environ["user_token"]
 spam_id = os.environ["spam_id"]
 
 # ------------- DISCORD CLIENT -------------
-prefix = "%$"
+prefix = "<>"
 client = commands.Bot(command_prefix=prefix)
-
-intervals = [3.6, 2.8, 3.0, 3.2, 3.4]
 
 # ------------- ROLE CHECK -------------
 def is_admin():
     async def predicate(ctx):
         role = discord.utils.get(ctx.author.roles, name="Admin")
-        if role:
-            return True
-        return False
+        return bool(role)
     return commands.check(predicate)
 
 # ------------- GLOBAL BLOCK: ONLY ADMIN CAN USE COMMANDS -------------
 @client.check
 async def global_admin_check(ctx):
-    # Allow "%$cmd" command for everyone
+    # Allow "<>cmd" for everyone
     if ctx.command.name == "cmd":
         return True
 
-    # All other commands require Admin role
     role = discord.utils.get(ctx.author.roles, name="Admin")
     if role:
         return True
@@ -55,17 +50,8 @@ def keep_alive():
     t = threading.Thread(target=run_flask)
     t.start()
 
-# ------------- BOT READY -------------
-@client.event
-async def on_ready():
-    print("*" * 30)
-    print(f"Logged in as {client.user}")
-    print("*" * 30)
-    spam.start()
-
-# ------------- SPAM LOOP -------------
+# ------------- RETRY SAFE SEND -------------
 async def send_with_retry(channel, content, attempt=1):
-    """Handles ratelimits & errors up to 3 attempts."""
     if attempt > 3:
         print("❌ Max retries reached. Skipping message.")
         return
@@ -89,19 +75,36 @@ async def send_with_retry(channel, content, attempt=1):
         await asyncio.sleep(10)
         await send_with_retry(channel, content, attempt + 1)
 
-@tasks.loop(seconds=random.choice(intervals))
-async def spam():
+# ------------- SAFE SPAM LOOP (NO RATE LIMITS) -------------
+spamming = False
+
+async def spam_loop():
+    await client.wait_until_ready()
     channel = client.get_channel(int(spam_id))
+
     if channel is None:
         print(f"❌ Invalid spam channel ID: {spam_id}")
         return
 
-    msg = "".join(random.choices("0123456789", k=30))
-    await send_with_retry(channel, msg)
+    while True:
+        if not spamming:
+            await asyncio.sleep(1)
+            continue
 
-@spam.before_loop
-async def before_spam():
-    await client.wait_until_ready()
+        msg = "".join(random.choices("0123456789", k=30))
+
+        await send_with_retry(channel, msg)
+
+        delay = random.uniform(5.5, 8.5)  # safest range
+        await asyncio.sleep(delay)
+
+# ------------- BOT READY -------------
+@client.event
+async def on_ready():
+    print("*" * 30)
+    print(f"Logged in as {client.user}")
+    print("*" * 30)
+    client.loop.create_task(spam_loop())
 
 # ------------- COMMANDS -------------
 
@@ -114,20 +117,16 @@ async def say(ctx, *, msg):
 @client.command()
 @is_admin()
 async def start(ctx):
-    if spam.is_running():
-        await ctx.send("⚠️ Spammer is already running.")
-    else:
-        spam.start()
-        await ctx.send("✅ Spammer Started!")
+    global spamming
+    spamming = True
+    await ctx.send("✅ Spammer Started!")
 
 @client.command()
 @is_admin()
 async def stop(ctx):
-    if spam.is_running():
-        spam.cancel()
-        await ctx.send("🛑 Spammer Stopped!")
-    else:
-        await ctx.send("⚠️ Spammer is not running.")
+    global spamming
+    spamming = False
+    await ctx.send("🛑 Spammer Stopped!")
 
 @client.command()
 @is_admin()
@@ -138,17 +137,17 @@ async def delete(ctx):
 async def cmd(ctx):
     await ctx.send(
         "**Commands (Admin only):**\n"
-        "`%$say <msg>` — Make bot send message\n"
-        "`%$start` — Start spammer\n"
-        "`%$stop` — Stop spammer\n"
-        "`%$delete` — Delete channel\n"
+        "`<>say <msg>` — Make bot send message\n"
+        "`<>start` — Start spammer\n"
+        "`<>stop` — Stop spammer\n"
+        "`<>delete` — Delete channel\n"
     )
 
 # ------------- ERROR HANDLER -------------
 @client.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send("❌ Unknown command. Use `%$cmd`.")
+        await ctx.send("❌ Unknown command. Use `<>cmd`.")
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ You do not have permission.")
     else:
